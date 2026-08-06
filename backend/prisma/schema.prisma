@@ -21,6 +21,12 @@ enum StaffRole {
   KITCHEN
 }
 
+enum UserRole {
+  ADMIN
+  STAFF
+  CUSTOMER
+}
+
 enum TableStatus {
   AVAILABLE
   RESERVED
@@ -147,17 +153,21 @@ model RestaurantSettings {
 
 model User {
 
-  id              String @id @default(uuid())
+  id              String   @id @default(uuid())
 
   fullName        String
 
-  phone           String @unique
+  phone           String?  @unique
 
-  email           String? @unique
+  email           String?  @unique
+
+  password        String?
+
+  role            UserRole @default(CUSTOMER)
 
   profileImage    String?
 
-  isVerified      Boolean @default(false)
+  isVerified      Boolean  @default(false)
 
   createdAt       DateTime @default(now())
 
@@ -169,6 +179,7 @@ model User {
 
   @@index([phone])
 
+  @@index([email])
 }
 
 // ===============================
