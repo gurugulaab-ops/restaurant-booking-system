@@ -1,0 +1,583 @@
+// ===============================
+// Prisma Generator
+// ===============================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===============================
+// ENUMS
+// ===============================
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  RECEPTIONIST
+  KITCHEN
+}
+
+enum TableStatus {
+  AVAILABLE
+  RESERVED
+  OCCUPIED
+  CLEANING
+  BLOCKED
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT
+  CONFIRMED
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  ADVANCE
+  FINAL
+  REFUND
+}
+
+enum PreOrderStatus {
+  PENDING
+  PREPARING
+  READY
+  SERVED
+}
+
+enum NotificationType {
+  BOOKING
+  PAYMENT
+  REMINDER
+  PROMOTION
+  SYSTEM
+}
+
+// ===============================
+// RESTAURANT
+// ===============================
+
+model Restaurant {
+
+  id              String   @id @default(uuid())
+
+  name            String
+
+  phone           String
+
+  email           String?  @unique
+
+  address         String
+
+  gstNumber       String?
+
+  logo            String?
+
+  openingTime     String
+
+  closingTime     String
+
+  currency        String   @default("INR")
+
+  bookingAmount   Decimal  @db.Decimal(10,2)
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  settings        RestaurantSettings?
+
+  staff           Staff[]
+
+  tables          RestaurantTable[]
+
+  categories      MenuCategory[]
+
+}
+
+// ===============================
+// RESTAURANT SETTINGS
+// ===============================
+
+model RestaurantSettings {
+
+  id                      String @id @default(uuid())
+
+  restaurantId            String @unique
+
+  restaurant              Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  maxBookingDays          Int @default(30)
+
+  bookingDurationMinutes  Int @default(90)
+
+  lateArrivalLimit        Int @default(15)
+
+  cancellationHours       Int @default(4)
+
+  autoAssignTable         Boolean @default(true)
+
+  allowPreOrder           Boolean @default(true)
+
+  allowTableMerge         Boolean @default(true)
+
+  createdAt               DateTime @default(now())
+
+  updatedAt               DateTime @updatedAt
+
+}
+
+// ===============================
+// USERS
+// ===============================
+
+model User {
+
+  id              String @id @default(uuid())
+
+  fullName        String
+
+  phone           String @unique
+
+  email           String? @unique
+
+  profileImage    String?
+
+  isVerified      Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  bookings        Booking[]
+
+  notifications   Notification[]
+
+  @@index([phone])
+
+}
+
+// ===============================
+// STAFF
+// ===============================
+
+model Staff {
+
+  id              String @id @default(uuid())
+
+  restaurantId    String
+
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  fullName        String
+
+  phone           String @unique
+
+  email           String? @unique
+
+  passwordHash    String
+
+  role            StaffRole
+
+  isActive        Boolean @default(true)
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  @@index([restaurantId])
+
+  @@index([phone])
+
+}
+// ===============================
+// RESTAURANT TABLES
+// ===============================
+
+model RestaurantTable {
+
+  id              String   @id @default(uuid())
+
+  restaurantId    String
+
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  tableName       String
+
+  capacity        Int
+
+  floor           String?
+
+  section         String?
+
+  status          TableStatus @default(AVAILABLE)
+
+  isActive        Boolean @default(true)
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  assignments     BookingTableAssignment[]
+
+  groupItems      TableGroupItem[]
+
+  @@index([restaurantId])
+
+  @@index([status])
+
+  @@unique([restaurantId, tableName])
+
+}
+
+// ===============================
+// TABLE GROUP
+// Used for combining tables
+// Example:
+// Group A -> Table 1 + Table 2
+// ===============================
+
+model TableGroup {
+
+  id              String   @id @default(uuid())
+
+  groupName       String
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  tables          TableGroupItem[]
+
+}
+
+// ===============================
+// TABLE GROUP ITEMS
+// ===============================
+
+model TableGroupItem {
+
+  id              String   @id @default(uuid())
+
+  groupId         String
+
+  tableId         String
+
+  group           TableGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  table           RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, tableId])
+
+}
+// ===============================
+// MENU CATEGORY
+// ===============================
+
+model MenuCategory {
+
+  id              String   @id @default(uuid())
+
+  restaurantId    String
+
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  name            String
+
+  description     String?
+
+  displayOrder    Int @default(0)
+
+  isActive        Boolean @default(true)
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  items           MenuItem[]
+
+  @@index([restaurantId])
+
+  @@unique([restaurantId, name])
+
+}
+
+// ===============================
+// MENU ITEM
+// ===============================
+
+model MenuItem {
+
+  id                  String   @id @default(uuid())
+
+  categoryId          String
+
+  category            MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  name                String
+
+  description         String?
+
+  price               Decimal @db.Decimal(10,2)
+
+  image               String?
+
+  preparationTime     Int
+
+  isVeg               Boolean @default(true)
+
+  isAvailable         Boolean @default(true)
+
+  displayOrder        Int @default(0)
+
+  createdAt           DateTime @default(now())
+
+  updatedAt           DateTime @updatedAt
+
+  preOrderItems       PreOrderItem[]
+
+  @@index([categoryId])
+
+  @@index([isAvailable])
+
+}
+// ===============================
+// BOOKINGS
+// ===============================
+
+model Booking {
+
+  id              String   @id @default(uuid())
+
+  bookingCode     String   @unique
+
+  userId          String
+
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bookingDate     DateTime
+
+  startTime       DateTime
+
+  endTime         DateTime
+
+  guestCount      Int
+
+  status          BookingStatus @default(PENDING_PAYMENT)
+
+  specialRequest  String?
+
+  qrCode          String?
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  tableAssignments BookingTableAssignment[]
+
+  payments        Payment[]
+
+  preOrder        PreOrder?
+
+  history         BookingStatusHistory[]
+
+  notifications   Notification[]
+
+  @@index([bookingDate])
+
+  @@index([status])
+
+  @@index([userId])
+
+}
+
+// ===============================
+// BOOKING TABLE ASSIGNMENT
+// One booking can have multiple tables
+// ===============================
+
+model BookingTableAssignment {
+
+  id              String   @id @default(uuid())
+
+  bookingId       String
+
+  tableId         String
+
+  assignedBy      String?
+
+  assignedAt      DateTime @default(now())
+
+  releasedAt      DateTime?
+
+  isActive        Boolean @default(true)
+
+  booking         Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  table           RestaurantTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+
+  @@index([tableId])
+
+  @@index([isActive])
+
+}
+
+// ===============================
+// PAYMENTS
+// ===============================
+
+model Payment {
+
+  id                  String   @id @default(uuid())
+
+  bookingId           String
+
+  booking             Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  gateway             String
+
+  gatewayTransaction  String?
+
+  amount              Decimal @db.Decimal(10,2)
+
+  paymentType         PaymentType
+
+  status              PaymentStatus @default(PENDING)
+
+  refundAmount        Decimal? @db.Decimal(10,2)
+
+  paidAt              DateTime?
+
+  createdAt           DateTime @default(now())
+
+  @@index([bookingId])
+
+  @@index([status])
+
+}
+// ===============================
+// PRE ORDER
+// ===============================
+
+model PreOrder {
+
+  id              String   @id @default(uuid())
+
+  bookingId       String   @unique
+
+  booking         Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  status          PreOrderStatus @default(PENDING)
+
+  notes           String?
+
+  totalAmount     Decimal @default(0) @db.Decimal(10,2)
+
+  createdAt       DateTime @default(now())
+
+  updatedAt       DateTime @updatedAt
+
+  items           PreOrderItem[]
+
+}
+
+// ===============================
+// PRE ORDER ITEMS
+// ===============================
+
+model PreOrderItem {
+
+  id              String   @id @default(uuid())
+
+  preOrderId      String
+
+  menuItemId      String
+
+  quantity        Int
+
+  unitPrice       Decimal @db.Decimal(10,2)
+
+  totalPrice      Decimal @db.Decimal(10,2)
+
+  preOrder        PreOrder @relation(fields: [preOrderId], references: [id], onDelete: Cascade)
+
+  menuItem        MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  @@index([preOrderId])
+
+  @@index([menuItemId])
+
+}
+
+// ===============================
+// NOTIFICATIONS
+// ===============================
+
+model Notification {
+
+  id              String   @id @default(uuid())
+
+  userId          String
+
+  bookingId       String?
+
+  title           String
+
+  message         String
+
+  type            NotificationType
+
+  isRead          Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  booking         Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+
+}
+
+// ===============================
+// BOOKING STATUS HISTORY
+// ===============================
+
+model BookingStatusHistory {
+
+  id              String   @id @default(uuid())
+
+  bookingId       String
+
+  oldStatus       BookingStatus?
+
+  newStatus       BookingStatus
+
+  remarks         String?
+
+  changedBy       String?
+
+  createdAt       DateTime @default(now())
+
+  booking         Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+
+}
+
